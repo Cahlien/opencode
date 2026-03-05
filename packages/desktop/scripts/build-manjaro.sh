@@ -1,22 +1,25 @@
 #!/usr/bin/env bash
-# Build OpenCode Desktop as a pacman package for Manjaro/Arch Linux
+# Build OpenCode Desktop as a pacman package for Manjaro/Arch Linux (x86_64 only)
 # Usage: ./scripts/build-manjaro.sh
 # Produces: opencode-desktop-<version>-1-x86_64.pkg.tar.zst
 
 set -euo pipefail
+
+for cmd in bun cargo makepkg; do
+  command -v "$cmd" >/dev/null || { echo "ERROR: $cmd is required but not found"; exit 1; }
+done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DESKTOP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$DESKTOP_DIR/../.." && pwd)"
 
 VERSION=$(bun -e "console.log(require('$DESKTOP_DIR/package.json').version)")
-ARCH=$(uname -m)
 
-echo "Building OpenCode Desktop v${VERSION} for Manjaro Linux (${ARCH})"
+echo "Building OpenCode Desktop v${VERSION} for Manjaro Linux (x86_64)"
 
 echo ">> Checking bun dependencies..."
 cd "$REPO_ROOT"
-bun install --frozen-lockfile 2>/dev/null || bun install
+bun install --frozen-lockfile || bun install
 
 echo ">> Building OpenCode CLI sidecar..."
 cd "$REPO_ROOT/packages/opencode"
@@ -54,6 +57,7 @@ cp "$SIDECAR" "$PKG_ROOT/usr/bin/opencode-cli"
 chmod 755 "$PKG_ROOT/usr/bin/opencode-desktop"
 chmod 755 "$PKG_ROOT/usr/bin/opencode-cli"
 
+# Uses dev icons; change to icons/prod for release builds
 ICONS_DIR="$DESKTOP_DIR/src-tauri/icons/dev"
 if [ -f "$ICONS_DIR/32x32.png" ]; then
   cp "$ICONS_DIR/32x32.png" "$PKG_ROOT/usr/share/icons/hicolor/32x32/apps/opencode-desktop.png"
@@ -89,7 +93,7 @@ pkgver=${VERSION}
 pkgrel=1
 pkgdesc='The open source AI coding agent - Desktop Application'
 arch=('x86_64')
-url='https://github.com/cahlien/opencode'
+url='https://github.com/anomalyco/opencode'
 license=('MIT')
 depends=(
   'webkit2gtk-4.1'
@@ -97,16 +101,13 @@ depends=(
   'libayatana-appindicator'
   'openssl'
   'libsoup3'
-  'glib2'
-  'cairo'
-  'pango'
-  'gdk-pixbuf2'
 )
 optdepends=(
   'xdg-utils: for xdg-open support'
 )
 provides=('opencode-desktop')
 conflicts=('opencode-desktop-bin' 'opencode-desktop-git')
+# Bun-compiled sidecar binary breaks when stripped
 options=('!strip')
 
 package() {
